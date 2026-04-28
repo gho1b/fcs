@@ -1,4 +1,4 @@
-# 09-FFI-Plan — Multi-language Integration Plan (Ringkas)
+# 12-FFI-Plan — Multi-language Integration Plan (Ringkas)
 
 ## Objective
 
@@ -169,7 +169,7 @@ Aturan detail akan ditetapkan saat implementasi binding diputuskan.
 
 Untuk integrasi antar service, pendekatan yang disarankan:
 
-- Kontrak DTO dapat diserialisasi ke JSON sesuai `07-Reference-Contracts.md`
+- Kontrak DTO dapat diserialisasi ke JSON sesuai `10-Reference-Contracts.md`
 - FFI boleh menyediakan helper encode/decode JSON **opsional**
 - JSON **tidak** menggantikan fixed-point integer sebagai authority
 

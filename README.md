@@ -1,6 +1,6 @@
 # Financial Computation Standard
 
-**Financial Computation Standard** adalah *kernel spesifikasi* untuk komputasi finansial yang **deterministik,
+**Financial Computation Standard** adalah _kernel spesifikasi_ untuk komputasi finansial yang **deterministik,
 audit-friendly, dan reusable lintas project**.
 
 Dokumen dan kontrak di repo ini mendefinisikan **bagaimana perhitungan finansial dilakukan dengan benar**, bukan
@@ -30,21 +30,21 @@ Dengan kata lain, repo ini mendefinisikan **financial computation kernel**, buka
 Standar ini mencakup:
 
 - **Money representation**
-    - fixed-point integer
-    - `currency` + `scale` eksplisit
+  - fixed-point integer
+  - `currency` + `scale` eksplisit
 - **Rounding semantics**
-    - pemisahan `scale` vs `rounding_quantum`
-    - rounding eksplisit dan versioned
+  - pemisahan `scale` vs `rounding_quantum`
+  - rounding eksplisit dan versioned
 - **Tax abstraction**
-    - adapter berbasis jurisdiksi
-    - tax sebagai regulatory policy
+  - adapter berbasis jurisdiksi
+  - tax sebagai regulatory policy
 - **Correction semantics**
-    - append-only correction
-    - traceable dan audit-safe
+  - append-only correction
+  - traceable dan audit-safe
 - **Reference contracts**
-    - JSON / event / persistence contract minimum
+  - JSON / event / persistence contract minimum
 - **Compliance rules**
-    - kriteria minimum implementasi yang dianggap patuh
+  - kriteria minimum implementasi yang dianggap patuh
 
 Semua definisi di sini bersifat **normatif** untuk implementasi.
 
@@ -125,8 +125,8 @@ Namun project **TIDAK BOLEH**:
 - Standar ini **versioned**
 - Invariant inti **tidak diubah tanpa version baru**
 - Perubahan regulatory rule dilakukan melalui:
-    - policy version baru, atau
-    - adapter version baru
+  - policy version baru, atau
+  - adapter version baru
 
 Backward compatibility diutamakan untuk:
 
@@ -155,16 +155,16 @@ Tidak ditujukan sebagai:
 
 ## Struktur Dokumen
 
-| Dokumen                                             | Tujuan                        |
-|-----------------------------------------------------|-------------------------------|
-| [01-Overview](01-Overview.md)                       | Ruang lingkup dan positioning |
-| [02-Principles](02-Principles.md)                   | Prinsip normatif inti         |
-| [03-Money](03-Money.md)                             | Representasi uang             |
-| [04-Rounding](04-Rounding.md)                       | Rounding & invariant          |
-| [05-Tax](05-Tax.md)                                 | Abstraksi tax                 |
-| [06-Correction](06-Correction.md)                   | Correction append-only        |
-| [07-Reference-Contracts](07-Reference-Contracts.md) | Kontrak data referensi        |
-| [08-Compliance-Test](08-Compliance-Test.md)         | Uji kepatuhan minimum         |
+| Dokumen                                                  | Tujuan                        |
+| -------------------------------------------------------- | ----------------------------- |
+| [01-Overview](docs/01-Overview.md)                       | Ruang lingkup dan positioning |
+| [02-Principles](docs/02-Principles.md)                   | Prinsip normatif inti         |
+| [03-Money](docs/03-Money.md)                             | Representasi uang             |
+| [04-Rounding](docs/04-Rounding.md)                       | Rounding & invariant          |
+| [05-Tax](docs/05-Tax.md)                                 | Abstraksi tax                 |
+| [06-Correction](docs/06-Correction.md)                   | Correction append-only        |
+| [07-Reference-Contracts](docs/07-Reference-Contracts.md) | Kontrak data referensi        |
+| [08-Compliance-Test](docs/08-Compliance-Test.md)         | Uji kepatuhan minimum         |
 
 ---
 

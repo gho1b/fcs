@@ -92,7 +92,8 @@ Contoh:
 - jika project memilih ISO 4217, maka format `currency` harus mengikuti format ISO 4217
 - jika project memilih namespace internal, maka formatnya harus mengikuti standard internal tersebut secara konsisten
 
-Standar ini tidak menetapkan satu format universal di atas semua namespace, tetapi mewajibkan project memilih satu aturan format yang stabil dan terdokumentasi.
+Standar ini tidak menetapkan satu format universal di atas semua namespace, tetapi mewajibkan project memilih satu
+aturan format yang stabil dan terdokumentasi.
 
 Project-specific policy boleh menambahkan:
 
@@ -112,9 +113,8 @@ Dokumen ini adalah owner untuk:
 - sign semantics untuk monetary value
 - aturan validitas dasar sebelum arithmetic dilakukan
 
-Dokumen ini **sengaja** mempertahankan `Money` sebagai primitive generik.
-
-Karena itu, dokumen ini tidak memasukkan context domain seperti:
+Dokumen ini **sengaja** mempertahankan `Money` sebagai primitive generik sehingga tidak memasukkan context domain
+seperti berikut:
 
 - authority source
 - valuation context
@@ -122,7 +122,8 @@ Karena itu, dokumen ini tidak memasukkan context domain seperti:
 - reporting role
 - balance state
 
-Concern tersebut harus dimodelkan pada contract, policy, atau object domain di layer atas `Money`, bukan di primitive `Money` itu sendiri.
+Concern tersebut harus dimodelkan pada contract, policy, atau object domain di layer atas `Money`, bukan di primitive
+`Money` itu sendiri.
 
 ## Invariants
 
@@ -131,7 +132,8 @@ Concern tersebut harus dimodelkan pada contract, policy, atau object domain di l
 - Operasi aritmetika hanya valid bila `currency` dan `scale` sama.
 - Stored fixed-point amount adalah source of truth.
 - Normalized presentation value tidak boleh disimpan sebagai authority pengganti.
-- Implementasi boleh memisahkan `amount` dari header representasi selama relasi nilainya tetap eksplisit dan tidak ambigu.
+- Implementasi boleh memisahkan `amount` dari header representasi selama relasi nilainya tetap eksplisit dan tidak
+  ambigu.
 - `currency` harus diperlakukan sebagai identifier kanonik yang case-sensitive menurut contract project yang aktif.
 - format kanonik `currency` harus mengikuti spesifikasi identifier yang dipilih oleh project.
 
@@ -154,7 +156,8 @@ Project boleh memiliki payload ingestion sementara yang belum lengkap, tetapi pa
 - `amount = 0` adalah nilai yang valid.
 - Nilai nol tetap harus membawa `currency` dan `scale` yang jelas.
 - Nilai nol tidak menghapus kewajiban contract untuk mendefinisikan context representasinya.
-- Implementasi tidak boleh memperlakukan nilai nol sebagai "tidak ada nilai" kecuali contract spesifik memang menyatakannya.
+- Implementasi tidak boleh memperlakukan nilai nol sebagai "tidak ada nilai" kecuali contract spesifik memang
+  menyatakannya.
 - Nilai nol tetap mengikuti aturan equality dan comparison yang sama seperti nilai non-nol.
 
 Contoh:
@@ -193,7 +196,8 @@ Dua `Money` dianggap **strictly equal** hanya bila:
 - `currency` identik
 - `scale` identik
 
-Jika `currency` atau `scale` diwariskan dari header, maka strict equality dihitung setelah context efektif untuk masing-masing value berhasil di-resolve secara deterministik.
+Jika `currency` atau `scale` diwariskan dari header, maka strict equality dihitung setelah context efektif untuk
+masing-masing value berhasil di-resolve secara deterministik.
 
 ### Normalized Equality
 
@@ -211,7 +215,8 @@ Namun project harus tetap menyadari bahwa normalisasi dapat mengubah nilai repre
 - input memakai scale yang lebih presisi daripada scale internal
 - proses normalisasi memerlukan pembagian yang menghasilkan truncation atau rounding
 
-Dalam kasus seperti itu, hasil normalisasi tetap valid sebagai hasil transformasi policy, tetapi tidak boleh diasumsikan identik dengan representasi input awal.
+Dalam kasus seperti itu, hasil normalisasi tetap valid sebagai hasil transformasi policy, tetapi tidak boleh diasumsikan
+identik dengan representasi input awal.
 
 Contoh normalisasi lintas scale:
 
@@ -248,7 +253,8 @@ amount=100,  currency=USD, scale=100
 amount=1000, currency=USD, scale=1000
 ```
 
-Jika `Money` berasal dari header inheritance, normalized equality hanya boleh dievaluasi setelah semua field efektif (`amount`, `currency`, `scale`) pada masing-masing value sudah resolved.
+Jika `Money` berasal dari header inheritance, normalized equality hanya boleh dievaluasi setelah semua field efektif (
+`amount`, `currency`, `scale`) pada masing-masing value sudah resolved.
 
 ### Comparison
 
@@ -299,7 +305,8 @@ Project harus memilih salah satu perilaku ketika terjadi conflict:
 
 Implicit inheritance diperbolehkan hanya jika source header yang dipakai dapat ditentukan tanpa ambigu.
 
-Jika inheritance terjadi pada lebih dari satu level, contract project harus menentukan precedence dari yang paling dekat ke value hingga yang paling jauh.
+Jika inheritance terjadi pada lebih dari satu level, contract project harus menentukan precedence dari yang paling dekat
+ke value hingga yang paling jauh.
 
 Aturan yang direkomendasikan:
 
@@ -308,7 +315,8 @@ Aturan yang direkomendasikan:
 3. enclosing aggregate header
 4. outermost envelope header
 
-Jika dua header pada level yang sama memberi context yang bertentangan, input harus ditolak kecuali contract secara eksplisit mendefinisikan tie-break rule.
+Jika dua header pada level yang sama memberi context yang bertentangan, input harus ditolak kecuali contract secara
+eksplisit mendefinisikan tie-break rule.
 
 Contoh:
 
@@ -360,7 +368,8 @@ Invalid:
 }
 ```
 
-Invalid bila contract tidak mendefinisikan override currency lintas header atau conflict tersebut tidak ditangani secara eksplisit.
+Invalid bila contract tidak mendefinisikan override currency lintas header atau conflict tersebut tidak ditangani secara
+eksplisit.
 
 Invalid pada nested inheritance tanpa precedence yang jelas:
 
@@ -379,33 +388,41 @@ Invalid pada nested inheritance tanpa precedence yang jelas:
 }
 ```
 
-Jika project tidak mendefinisikan apakah `line.amount` mewarisi `batch.currency` atau `root.currency`, payload ini ambigu dan harus ditolak.
+Jika project tidak mendefinisikan apakah `line.amount` mewarisi `batch.currency` atau `root.currency`, payload ini
+ambigu dan harus ditolak.
 
 ## Large Integer and Serialization Safety
 
-Karena dokumen ini menargetkan JSON, event, database, dan integrasi lintas bahasa, implementasi harus memperhatikan keamanan integer besar.
+Karena dokumen ini menargetkan JSON, event, database, dan integrasi lintas bahasa, implementasi harus memperhatikan
+keamanan integer besar.
 
 Minimum guardrail:
 
 - `amount` tidak boleh silently truncated saat serialisasi atau deserialisasi
 - consumer tidak boleh mengubah `amount` menjadi floating point binary number sebagai source of truth
-- project harus mendokumentasikan apakah integer dikirim sebagai number atau string pada boundary yang rawan precision loss
+- project harus mendokumentasikan apakah integer dikirim sebagai number atau string pada boundary yang rawan precision
+  loss
 
 Rekomendasi interoperability minimum:
 
 - project sebaiknya menentukan satu baseline signed integer compatibility untuk contract publik
-- jika ada consumer JavaScript atau runtime lain yang tidak aman untuk integer besar, representasi string sebaiknya dipilih pada boundary tersebut
+- jika ada consumer JavaScript atau runtime lain yang tidak aman untuk integer besar, representasi string sebaiknya
+  dipilih pada boundary tersebut
 - intermediate representation internal boleh lebih lebar dari contract publik selama semantic result tidak berubah
 
 Baseline kompatibilitas minimum yang direkomendasikan oleh standard ini adalah **signed 64-bit integer semantics**.
 
 Artinya:
 
-- semua implementasi sebaiknya mampu merepresentasikan dan memproses `amount` dalam rentang signed 64-bit tanpa kehilangan nilai
-- representasi transport tidak harus selalu berupa literal `int64`, tetapi semantic nilai signed 64-bit harus tetap terjaga
-- implementasi internal boleh memakai `i128`, bigint, atau representasi lain yang lebih lebar selama kompatibilitas baseline signed 64-bit tetap dijaga
+- semua implementasi sebaiknya mampu merepresentasikan dan memproses `amount` dalam rentang signed 64-bit tanpa
+  kehilangan nilai
+- representasi transport tidak harus selalu berupa literal `int64`, tetapi semantic nilai signed 64-bit harus tetap
+  terjaga
+- implementasi internal boleh memakai `i128`, bigint, atau representasi lain yang lebih lebar selama kompatibilitas
+  baseline signed 64-bit tetap dijaga
 
-Jika suatu transport atau runtime tidak dapat menjamin preservasi lossless untuk signed 64-bit integer dalam encoding native-nya, implementasi **harus** memakai alternate encoding yang lossless.
+Jika suatu transport atau runtime tidak dapat menjamin preservasi lossless untuk signed 64-bit integer dalam encoding
+native-nya, implementasi **harus** memakai alternate encoding yang lossless.
 
 Contoh:
 
@@ -432,7 +449,8 @@ Pilihan ini adalah contract concern dan tidak boleh dibiarkan implicit.
 Karena itu, project harus membedakan setidaknya dua concern:
 
 - **storage precision**: precision yang dipakai untuk menyimpan dan mengangkut `Money`
-- **economic or settlement precision**: precision atau quantum yang berlaku saat nilai dipakai untuk settlement, display final, atau rule ekonomi tertentu
+- **economic or settlement precision**: precision atau quantum yang berlaku saat nilai dipakai untuk settlement, display
+  final, atau rule ekonomi tertentu
 
 Contoh:
 
@@ -447,7 +465,8 @@ Artinya:
 - sistem boleh menyimpan nilai dengan precision 3 digit
 - tetapi settlement atau customer-facing amount dapat tetap tunduk pada quantum 2 digit
 
-Dokumen ini tidak menetapkan bagaimana settlement precision dipilih. Pemilihan tersebut dimiliki oleh policy, rounding, atau contract domain yang relevan.
+Dokumen ini tidak menetapkan bagaimana settlement precision dipilih. Pemilihan tersebut dimiliki oleh policy, rounding,
+atau contract domain yang relevan.
 
 Namun implementasi tidak boleh mengasumsikan bahwa `scale` penyimpanan otomatis sama dengan precision ekonomi final.
 
@@ -489,7 +508,8 @@ Transformasi kedua adalah currency conversion dan berada di luar scope dokumen i
 
 ## Domain Context Boundary
 
-Beberapa sistem bisnis, seperti core banking, treasury, clearing, atau ledger-heavy platform, dapat membutuhkan context moneter tambahan yang sangat kuat.
+Beberapa sistem bisnis, seperti core banking, treasury, clearing, atau ledger-heavy platform, dapat membutuhkan context
+moneter tambahan yang sangat kuat.
 
 Contohnya:
 
@@ -503,7 +523,8 @@ Dokumen ini tidak memasukkan distinction tersebut ke dalam identity normatif `Mo
 Dengan demikian:
 
 - dua `Money` dengan `amount`, `currency`, dan `scale` yang sama tetap dianggap identik pada level primitive ini
-- jika project membutuhkan distinction domain yang lebih kuat, distinction tersebut harus dimodelkan di object atau contract yang membungkus `Money`
+- jika project membutuhkan distinction domain yang lebih kuat, distinction tersebut harus dimodelkan di object atau
+  contract yang membungkus `Money`
 - arithmetic generic pada kernel ini tetap beroperasi pada primitive `Money`, bukan pada context domain yang lebih kaya
 
 Keputusan ini diambil untuk menjaga standard tetap:

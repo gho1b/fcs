@@ -177,6 +177,10 @@ Division finansial hampir selalu menghasilkan sisa. Karena itu:
 - division tidak boleh menyembunyikan loss secara implicit
 - implementasi tidak boleh memakai floating point binary computation lalu membulatkan balik sebagai source of truth
 
+Dalam dokumen ini, division tidak boleh diasumsikan selalu menghasilkan satu `Money` final.
+Primitive `Money` tetap sederhana pada level representasi data, tetapi hasil aritmatika division harus tetap menjaga
+conservation of amount secara eksplisit.
+
 Reference model:
 
 ```text
@@ -184,14 +188,40 @@ quotient = dividend / divisor
 remainder = dividend % divisor
 ```
 
+Bentuk hasil normatif minimum untuk division adalah:
+
+```text
+DivisionResult {
+  quotient,
+  remainder
+}
+```
+
+`quotient` dan `remainder` harus memakai `currency` dan `scale` efektif yang sama dengan dividend.
+
+Implementasi atau policy boleh menambahkan metadata turunan seperti `carry`, note, atau presentation field lain,
+tetapi field semacam itu tidak boleh menggantikan `remainder` sebagai source of truth untuk conservation.
+
+Invariant rekonsiliasi minimum untuk `DivisionResult` adalah:
+
+```text
+dividend = divisor * quotient + remainder
+```
+
+`quotient` dan `remainder` harus ditentukan secara deterministik sehingga invariant tersebut dapat direplay untuk input
+yang sama.
+
 `remainder` harus:
 
 - ditolak bila context tidak mengizinkan residual
 - atau didistribusikan secara eksplisit oleh allocation policy
 
+Hasil tunggal berupa `Money` hanya boleh diperlakukan final bila `remainder = 0` atau residual sudah diselesaikan
+secara eksplisit oleh policy yang relevan.
+
 ## Allocation
 
-Allocation adalah pembagian satu amount ke banyak target dengan total konservatif.
+Allocation adalah pembagian satu amount atau residual ke banyak target dengan total konservatif.
 
 Invariant allocation:
 
@@ -233,9 +263,11 @@ Operasi berikut tidak valid tanpa policy tambahan:
 
 - add/subtract lintas currency
 - add/subtract lintas scale
+- division by zero
 - divide tanpa definisi residual handling
 - multiply by floating point binary number sebagai source of truth
 - mempromosikan raw result yang masih membutuhkan rounding domain-specific menjadi final amount tanpa policy yang relevan
+- memperlakukan hasil division dengan `remainder != 0` sebagai satu `Money` final tanpa penyelesaian residual yang eksplisit
 
 ## Compliance Outline
 

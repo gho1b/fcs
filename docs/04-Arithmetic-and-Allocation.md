@@ -21,12 +21,62 @@ Operasi `add`, `subtract`, `compare`, dan `allocate` hanya valid bila:
 
 - `currency` identik
 - `scale` identik
+- effective monetary context sudah resolved secara deterministik
 - policy tambahan yang diperlukan tersedia
 
 Jika precondition gagal, implementasi harus:
 
 - menolak operasi, atau
-- melakukan normalisasi eksplisit sesuai policy yang terdokumentasi
+- menerima operand yang sudah lebih dulu dinormalisasi secara eksplisit sesuai policy yang terdokumentasi
+
+Core arithmetic pada dokumen ini tidak boleh melakukan normalisasi implicit untuk menebak target `scale`.
+Pemilihan target `scale` adalah tanggung jawab consumer, contract, atau policy owner di luar operasi inti ini.
+
+## Normalization and Comparison Semantics
+
+Dokumen ini mengakui bahwa normalisasi representasi dapat diperlukan sebelum arithmetic atau comparison dilakukan,
+tetapi dokumen ini bukan owner dari algoritme normalisasi generik lintas `scale`.
+
+Normalisasi dalam konteks dokumen ini hanya berfungsi sebagai pre-step eksplisit yang dilakukan di luar core operation
+sebelum operand masuk ke `add`, `subtract`, `compare`, atau `allocate`.
+
+Karena itu:
+
+- core tidak boleh melakukan auto-normalization
+- core tidak boleh menebak target `scale`
+- hasil operasi inti hanya valid setelah semua operand memiliki `currency` dan `scale` efektif yang identik
+
+Normalisasi hanya boleh diperlakukan valid bila:
+
+- semantic unit tetap sama
+- transformasi dilakukan secara deterministik
+- hasilnya lossless
+
+Jika normalisasi lintas `scale` membutuhkan truncation, rounding, atau perubahan representasi yang tidak lossless,
+maka hasil tersebut tidak boleh dipakai sebagai dasar comparison generik pada dokumen ini.
+
+Kebutuhan semacam itu harus dimodelkan sebagai concern policy atau rounding domain yang terpisah.
+
+### Comparison
+
+Operasi comparison pada dokumen ini menghasilkan salah satu dari:
+
+- `LESS_THAN`
+- `EQUAL`
+- `GREATER_THAN`
+
+Pada level model generik, comparison monetary tetap membentuk partial order, bukan total order universal.
+Namun operasi inti `compare` pada dokumen ini hanya menerima operand yang sudah comparable.
+
+Comparison numerik hanya valid bila:
+
+- `currency` identik
+- `scale` identik
+
+Jika dua operand awalnya memiliki `scale` berbeda, consumer wajib melakukan normalisasi mandiri terlebih dahulu.
+Core tidak boleh menerima mismatch itu lalu memilih sendiri representasi pembandingnya.
+
+Jika salah satu syarat comparison tidak terpenuhi, operasi harus ditolak sebagai invalid comparison.
 
 ## Addition and Subtraction
 
@@ -59,7 +109,7 @@ Perkalian dengan rate digunakan untuk:
 - proportional allocation
 - field lain yang membutuhkan perhitungan berbasis rate
 
-Standar ini merekomendasikan rate direpresentasikan sebagai rasio integer atau fixed-point policy-defined, bukan floating point.
+Standar ini merekomendasikan rate direpresentasikan sebagai rasio **integer** atau fixed-point policy-defined, bukan floating point.
 
 Reference model:
 
@@ -67,15 +117,65 @@ Reference model:
 raw_amount = amount * numerator / denominator
 ```
 
-Keluaran dari operasi ini belum final sampai aturan rounding stage diterapkan.
+Operasi `multiply by rate` dapat menghasilkan `raw_amount` sebagai intermediate result.
+
+Jika hasil tersebut menurut policy aktif masih memerlukan rounding atau quantization tambahan, hasil itu belum boleh
+diperlakukan sebagai final amount.
+
+Jika hasilnya sudah exact pada representasi yang berlaku dan policy aktif tidak mensyaratkan transformasi tambahan,
+hasil tersebut boleh diperlakukan sebagai final amount.
+
+## Rounding Policy
+
+Dokumen ini mengakui rounding sebagai boundary operasional yang diperlukan ketika hasil `multiply by rate`, division
+finalization, atau transformasi lain masih membutuhkan representasi hasil yang lebih sempit daripada raw computation
+menurut policy yang aktif.
+
+Namun dokumen ini tidak menjadi owner untuk:
+
+- target settlement quantum
+- target regulatory quantum
+- target reporting precision final
+
+Concern tersebut boleh dimiliki oleh contract, policy implementasi, atau domain rule di layer atas core arithmetic.
+
+Dalam ruang lingkup dokumen ini:
+
+- rounding mode harus ditentukan secara eksplisit oleh policy yang relevan
+- dokumen ini tidak menetapkan satu daftar mode rounding universal yang wajib untuk semua project
+- policy yang aktif boleh dan sebaiknya membatasi mode rounding yang legal untuk domain tersebut
+- implementasi tidak boleh memakai rounding mode di luar yang diizinkan oleh policy aktif
+- core arithmetic tidak boleh menebak quantum atau precision final milik domain tertentu
+- hasil rounding untuk satu domain tidak boleh otomatis dianggap sebagai canonical representation untuk domain lain
+
+Jika suatu operasi menghasilkan `raw_amount` yang masih membutuhkan rounding atau quantization domain-specific, maka
+nilai tersebut boleh hidup sebagai intermediate computational value.
+
+Intermediate value semacam itu:
+
+- belum boleh diperlakukan sebagai final amount
+- belum boleh dipakai sebagai authoritative settlement amount
+- belum boleh dipakai sebagai authoritative reporting amount
+- belum boleh menggantikan canonical stored amount tanpa policy domain yang relevan
+
+Jika policy rounding yang relevan sudah tersedia, implementasi harus memastikan:
+
+- mode rounding yang dipakai deterministik
+- stage penerapan rounding terdokumentasi
+- hasil replayable untuk input dan policy yang sama
+
+Rounding yang berasal dari concern regulatory, settlement, tax, cash handling, atau reporting domain harus diperlakukan
+sebagai transformasi domain-specific, bukan sebagai perilaku implicit dari primitive `Money` itu sendiri.
 
 ## Division Semantics
 
 Division finansial hampir selalu menghasilkan sisa. Karena itu:
 
+- division pada core monetary harus mengikuti integer atau fixed-point semantics yang deterministik
 - hasil quotient harus deterministik
 - residual harus punya aturan distribusi
 - division tidak boleh menyembunyikan loss secara implicit
+- implementasi tidak boleh memakai floating point binary computation lalu membulatkan balik sebagai source of truth
 
 Reference model:
 
@@ -135,6 +235,7 @@ Operasi berikut tidak valid tanpa policy tambahan:
 - add/subtract lintas scale
 - divide tanpa definisi residual handling
 - multiply by floating point binary number sebagai source of truth
+- mempromosikan raw result yang masih membutuhkan rounding domain-specific menjadi final amount tanpa policy yang relevan
 
 ## Compliance Outline
 

@@ -35,13 +35,13 @@ pub enum RoundingMode {
     /// Often called banker's rounding or unbiased rounding.
     #[default]
     HalfEven,
-    /// Round to nearest; ties go to the greater numeric result.
+    /// Round to nearest; ties go to the greater numeric (toward +∞)
     ///
     /// Examples:
     /// - `2.5 -> 3`
     /// - `-2.5 -> -2`
     HalfUp,
-    /// Round to nearest; ties go to the smaller numeric result.
+    /// Round to nearest; ties go to the smaller numeric (toward -∞)
     ///
     /// Examples:
     /// - `2.5 -> 2`

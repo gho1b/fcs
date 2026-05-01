@@ -30,26 +30,30 @@ pub(crate) fn valid_scale(scale: i64) -> bool {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum RoundingMode {
-    /// ## Banker's / Unbiased Rounding
+    /// Round to nearest; ties go to the even result.
     ///
-    /// Closest to even
+    /// Often called banker's rounding or unbiased rounding.
     #[default]
     HalfEven,
-    /// ## Commercial Rounding
+    /// Round to nearest; ties go to the greater numeric result.
     ///
-    /// x >= 0.5
+    /// Examples:
+    /// - `2.5 -> 3`
+    /// - `-2.5 -> -2`
     HalfUp,
-    /// ## Nearest Neighborhood Rounding
+    /// Round to nearest; ties go to the smaller numeric result.
     ///
-    /// x < 0.5
+    /// Examples:
+    /// - `2.5 -> 2`
+    /// - `-2.5 -> -3`
     HalfDown,
-    /// ## toward -∞
+    /// Round toward negative infinity.
     Floor,
-    /// ## toward +∞
+    /// Round toward positive infinity.
     Ceil,
-    /// ## Truncation
+    /// Round toward zero.
     TowardZero,
-    /// ## Symmetric away from 0
+    /// Round away from zero.
     AwayFromZero,
 }
 

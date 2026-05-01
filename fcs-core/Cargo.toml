@@ -10,3 +10,14 @@ readme.workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
+dashmap = { workspace = true, features = ["rayon"] }
+rayon = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+criterion-plot = { workspace = true }
+rust_decimal = "1.41.0"
+
+[[bench]]
+name = "fixed_point_vs_float"
+harness = false

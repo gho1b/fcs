@@ -113,6 +113,42 @@ impl FixedPoint {
         self.scale
     }
 
+    pub fn try_rescale_exact(&self, target_scale: i64) -> Result<Self, FixedPointError> {
+        if !valid_scale(target_scale) {
+            return Err(FixedPointError::InvalidScale {
+                scale: target_scale,
+            });
+        }
+
+        if target_scale == self.scale {
+            return Ok(*self);
+        }
+
+        if target_scale > self.scale {
+            let factor = target_scale / self.scale;
+            debug_assert_eq!(target_scale % self.scale, 0);
+
+            let atoms = self
+                .atoms
+                .checked_mul(factor)
+                .ok_or(FixedPointError::ArithmeticOverflow)?;
+
+            return Ok(Self::new(atoms, target_scale));
+        }
+
+        let factor = self.scale / target_scale;
+        debug_assert_eq!(self.scale % target_scale, 0);
+
+        if self.atoms % factor != 0 {
+            return Err(FixedPointError::NonExactRescale {
+                from: self.scale,
+                to: target_scale,
+            });
+        }
+
+        Ok(Self::new(self.atoms / factor, target_scale))
+    }
+
     /// Bagian unit (whole/major). Contoh: 1200/100 => 12
     #[inline]
     pub fn units(&self) -> i64 {
@@ -584,6 +620,24 @@ mod test {
     }
 
     #[test]
+    #[should_panic(expected = "scale must be greater than zero")]
+    fn new_panics_on_non_positive_scale() {
+        let _ = FixedPoint::new(42, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "scale must power of 10")]
+    fn new_panics_on_non_power_of_ten_scale() {
+        let _ = FixedPoint::new(42, 12);
+    }
+
+    #[test]
+    #[should_panic(expected = "precision too large for i64 scale (max 18)")]
+    fn new_precision_panics_when_precision_too_large() {
+        let _ = FixedPoint::new_precision(42, 19);
+    }
+
+    #[test]
     fn helper_methods_return_expected_values() {
         let zero = FixedPoint::new(0, 100);
         let value = FixedPoint::new(123, 100);
@@ -594,6 +648,54 @@ mod test {
         assert_eq!(value.scale(), 100);
         assert!(value.same_scale(&zero));
         assert!(!value.same_scale(&other_scale));
+    }
+
+    #[test]
+    fn try_rescale_exact_preserves_value_when_exact() {
+        assert_eq!(
+            FixedPoint::new(123, 100).try_rescale_exact(1_000).unwrap(),
+            FixedPoint::new(1_230, 1_000)
+        );
+        assert_eq!(
+            FixedPoint::new(1_230, 1_000).try_rescale_exact(100).unwrap(),
+            FixedPoint::new(123, 100)
+        );
+        assert_eq!(
+            FixedPoint::new(-1_230, 1_000).try_rescale_exact(100).unwrap(),
+            FixedPoint::new(-123, 100)
+        );
+        assert_eq!(
+            FixedPoint::new(123, 100).try_rescale_exact(100).unwrap(),
+            FixedPoint::new(123, 100)
+        );
+    }
+
+    #[test]
+    fn try_rescale_exact_rejects_invalid_target_scale() {
+        let value = FixedPoint::new(123, 100);
+
+        let err = value.try_rescale_exact(0).unwrap_err();
+        assert!(matches!(err, FixedPointError::InvalidScale { scale: 0 }));
+
+        let err = value.try_rescale_exact(12).unwrap_err();
+        assert!(matches!(err, FixedPointError::InvalidScale { scale: 12 }));
+    }
+
+    #[test]
+    fn try_rescale_exact_rejects_lossy_downscale() {
+        let err = FixedPoint::new(123, 100).try_rescale_exact(10).unwrap_err();
+        assert!(matches!(
+            err,
+            FixedPointError::NonExactRescale { from: 100, to: 10 }
+        ));
+    }
+
+    #[test]
+    fn try_rescale_exact_reports_overflow_when_upscaling() {
+        let err = FixedPoint::new(i64::MAX, 1)
+            .try_rescale_exact(10)
+            .unwrap_err();
+        assert!(matches!(err, FixedPointError::ArithmeticOverflow));
     }
 
     #[test]
@@ -724,6 +826,74 @@ mod test {
     }
 
     #[test]
+    fn try_div_i64_rejects_invalid_divisors() {
+        let value = FixedPoint::new(7, 1);
+
+        let err = value.try_div_i64(0).unwrap_err();
+        assert!(matches!(
+            err,
+            FixedPointError::InvalidDivisor {
+                operation: "div",
+                divisor: 0
+            }
+        ));
+
+        let err = value.try_div_i64(i64::MIN).unwrap_err();
+        assert!(matches!(
+            err,
+            FixedPointError::InvalidDivisor {
+                operation: "div",
+                divisor: i64::MIN
+            }
+        ));
+    }
+
+    #[test]
+    fn div_result_preserves_canonical_invariants_and_reconstructs_original() {
+        let cases = [
+            (7_i64, 3_i64),
+            (7, -3),
+            (-7, 3),
+            (-7, -3),
+            (1, 2),
+            (1, -2),
+            (-1, 2),
+            (-1, -2),
+            (9_223_372_036_854_775_000, 10),
+            (-9_223_372_036_854_775_000, -10),
+        ];
+
+        for (atoms, divisor) in cases {
+            let original = FixedPoint::new(atoms, 100);
+            let result = original.try_div_i64(divisor).unwrap();
+
+            assert!(result.div > 0, "atoms={atoms}, divisor={divisor}");
+            assert!(
+                result.rem >= 0 && result.rem < result.div,
+                "atoms={atoms}, divisor={divisor}, rem={}, div={}",
+                result.rem,
+                result.div
+            );
+            assert_eq!(result.quotient.scale(), original.scale());
+
+            let lhs = result.quotient.atoms() as i128;
+            let rhs = result.div as i128;
+            let rem = result.rem as i128;
+            let reconstructed = if divisor > 0 {
+                lhs * rhs + rem
+            } else {
+                -(lhs * rhs + rem)
+            };
+
+            assert_eq!(
+                reconstructed,
+                original.atoms() as i128,
+                "atoms={atoms}, divisor={divisor}"
+            );
+        }
+    }
+
+    #[test]
     fn div_i64_returns_expected_result() {
         let result = FixedPoint::new(7, 1).div_i64(3);
         assert_eq!(result.quotient.atoms(), 2);
@@ -745,6 +915,26 @@ mod test {
         assert_eq!(result.quotient.atoms(), -3);
         assert_eq!(result.rem, 2);
         assert_eq!(result.div, 3);
+    }
+
+    #[test]
+    fn try_to_fixed_point_reports_rounding_overflow() {
+        let result = DivResult {
+            quotient: FixedPoint::new(i64::MAX, 1),
+            rem: 1,
+            div: 2,
+        };
+
+        let err = result.try_to_fixed_point(RoundingMode::HalfUp).unwrap_err();
+        assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+
+        let err = result.try_to_fixed_point(RoundingMode::Ceil).unwrap_err();
+        assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+
+        assert_eq!(
+            result.try_to_fixed_point(RoundingMode::Floor),
+            Ok(FixedPoint::new(i64::MAX, 1))
+        );
     }
 
     #[test]

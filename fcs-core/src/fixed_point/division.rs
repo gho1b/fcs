@@ -1,36 +1,5 @@
+use super::{helper, FixedPoint, RoundingMode};
 use crate::error::FixedPointError;
-
-use super::{FixedPoint, RoundingMode};
-
-#[must_use]
-#[inline]
-pub(super) fn checked_div_rem_euclid_signed(a: i64, b: i64) -> Option<(i64, i64, i64)> {
-    if b == 0 {
-        return None;
-    }
-    if b == i64::MIN {
-        return None;
-    }
-
-    let div = b.abs();
-    let q = a.checked_div(div)?;
-    let r = a - q.checked_mul(div)?;
-    let (q, r) = if r >= 0 {
-        (q, r)
-    } else {
-        (q.checked_sub(1)?, r.checked_add(div)?)
-    };
-
-    if b > 0 {
-        Some((q, r, div))
-    } else if r == 0 {
-        Some((q.checked_neg()?, 0, div))
-    } else {
-        let q2 = q.checked_neg()?.checked_sub(1)?;
-        let r2 = div.checked_sub(r)?;
-        Some((q2, r2, div))
-    }
-}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct DivResult {
@@ -54,6 +23,9 @@ impl DivResult {
             return Ok(value);
         }
 
+        let positive = atoms.is_positive();
+        let step = if positive { 1 } else { -1 };
+
         let mut inc = || -> Result<(), FixedPointError> {
             value.atoms = value
                 .atoms
@@ -62,41 +34,20 @@ impl DivResult {
             Ok(())
         };
 
-        match mode {
-            RoundingMode::Floor => {}
-            RoundingMode::Ceil => inc()?,
-            RoundingMode::TowardZero => {
-                if atoms.is_negative() {
-                    inc()?;
-                }
-            }
-            RoundingMode::AwayFromZero => {
-                if atoms >= 0 {
-                    inc()?;
-                }
-            }
-            RoundingMode::HalfEven | RoundingMode::HalfUp | RoundingMode::HalfDown => {
-                let two_r = (r as i128) * 2;
-                let d128 = d as i128;
-
-                let should_up = if two_r > d128 {
-                    true
-                } else if two_r < d128 {
-                    false
-                } else {
-                    match mode {
-                        RoundingMode::HalfUp => true,
-                        RoundingMode::HalfDown => false,
-                        RoundingMode::HalfEven => atoms & 1 != 0,
-                        _ => unreachable!(),
-                    }
-                };
-
-                if should_up {
-                    inc()?;
-                }
-            }
-        }
+        //         let increment_abs = match mode {
+        //             RoundingMode::TowardZero => false,
+        //             RoundingMode::AwayFromZero => true,
+        //             RoundingMode::Ceil => positive,
+        //             RoundingMode::Floor => !positive,
+        //             RoundingMode::HalfEven
+        //             | RoundingMode::HalfCeil
+        //             | RoundingMode::HalfFloor
+        //             | RoundingMode::HalfTowardsZero
+        //             | RoundingMode::HalfAwayFromZero => {
+        //                 let twice_r = r.abs() * 2;
+        // let b = 2i32.try_into().ok();
+        //             }
+        //         };
 
         Ok(value)
     }
@@ -124,7 +75,7 @@ impl FixedPoint {
         }
 
         let mut quotient = *self;
-        let (atoms, rem, div) = checked_div_rem_euclid_signed(quotient.atoms, rhs)
+        let (atoms, rem, div) = helper::checked_div_rem_euclid_signed_i64(quotient.atoms, rhs)
             .ok_or(FixedPointError::ArithmeticOverflow)?;
 
         quotient.atoms = atoms;

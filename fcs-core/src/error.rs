@@ -1,3 +1,4 @@
+use std::num::TryFromIntError;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
@@ -23,4 +24,7 @@ pub enum FixedPointError {
         operation: &'static str,
         divisor: i64,
     },
+
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
 }

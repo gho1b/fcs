@@ -13,20 +13,17 @@ fn basic_add_sub() {
 }
 
 #[test]
-fn try_add_incompatible_scale() {
+fn add_supports_cross_scale_and_returns_max_scale() {
+    // 1.00 + 0.001 = 1.001 (scale=1000)
     let a = FixedPoint::new(100, 100);
-    let b = FixedPoint::new(100, 1000);
-    let err = a.try_add(&b).unwrap_err();
-    assert!(matches!(
-        err,
-        FixedPointError::IncompatibleScale { operation: "add", expected: 100, got: 1000 }
-    ));
-}
+    let b = FixedPoint::new(1, 1000);
+    let c = a + b;
+    assert_eq!(c.scale(), 1000);
+    assert_eq!(c.atoms(), 1001);
 
-#[test]
-#[should_panic(expected = "scale incompatible for add: expected 100 but got 1000")]
-fn add_panics_on_incompatible_scale() {
-    let _ = FixedPoint::new(100, 100) + FixedPoint::new(100, 1000);
+    // commutative
+    let d = b + a;
+    assert_eq!(d, c);
 }
 
 #[test]
@@ -72,20 +69,13 @@ fn add_commutative_same_scale() {
 }
 
 #[test]
-fn try_sub_incompatible_scale() {
+fn sub_supports_cross_scale_and_returns_max_scale() {
+    // 1.00 - 0.001 = 0.999 (scale=1000)
     let a = FixedPoint::new(100, 100);
-    let b = FixedPoint::new(100, 1000);
-    let err = a.try_sub(&b).unwrap_err();
-    assert!(matches!(
-        err,
-        FixedPointError::IncompatibleScale { operation: "sub", expected: 100, got: 1000 }
-    ));
-}
-
-#[test]
-#[should_panic]
-fn sub_panics_on_incompatible_scale() {
-    let _ = FixedPoint::new(100, 100) - FixedPoint::new(100, 1000);
+    let b = FixedPoint::new(1, 1000);
+    let c = a - b;
+    assert_eq!(c.scale(), 1000);
+    assert_eq!(c.atoms(), 999);
 }
 
 #[test]
@@ -93,6 +83,25 @@ fn sub_panics_on_incompatible_scale() {
 fn add_assign_panics_on_overflow() {
     let mut a = FixedPoint::new(i64::MAX, 100);
     a += FixedPoint::new(1, 100);
+}
+
+#[test]
+fn sum_supports_cross_scale_and_returns_max_scale() {
+    let values = [
+        FixedPoint::new(100, 100),  // 1.00
+        FixedPoint::new(1, 1000),   // 0.001
+        FixedPoint::new(-50, 100),  // -0.50
+    ];
+    let s: FixedPoint = values.into_iter().sum();
+    assert_eq!(s.scale(), 1000);
+    assert_eq!(s.atoms(), 501); // 0.501
+}
+
+#[test]
+fn sum_empty_returns_zero_scale_one() {
+    let empty: [FixedPoint; 0] = [];
+    let s: FixedPoint = empty.into_iter().sum();
+    assert_eq!(s, FixedPoint::new(0, 1));
 }
 
 #[test]
@@ -211,7 +220,7 @@ fn try_quantize_preserves_or_increases_scale_exactly() {
 #[test]
 fn try_quantize_rounds_positive_values() {
     assert_eq!(FixedPoint::new(125, 100).try_quantize(10, RoundingMode::HalfEven).unwrap(), FixedPoint::new(12, 10));
-    assert_eq!(FixedPoint::new(125, 100).try_quantize(10, RoundingMode::HalfUp).unwrap(), FixedPoint::new(13, 10));
+    assert_eq!(FixedPoint::new(125, 100).try_quantize(10, RoundingMode::HalfCeil).unwrap(), FixedPoint::new(13, 10));
     assert_eq!(FixedPoint::new(129, 100).try_quantize(10, RoundingMode::Ceil).unwrap(), FixedPoint::new(13, 10));
     assert_eq!(FixedPoint::new(129, 100).try_quantize(10, RoundingMode::Floor).unwrap(), FixedPoint::new(12, 10));
 }
@@ -219,7 +228,7 @@ fn try_quantize_rounds_positive_values() {
 #[test]
 fn try_quantize_rounds_negative_values() {
     assert_eq!(FixedPoint::new(-125, 100).try_quantize(10, RoundingMode::HalfEven).unwrap(), FixedPoint::new(-12, 10));
-    assert_eq!(FixedPoint::new(-125, 100).try_quantize(10, RoundingMode::HalfDown).unwrap(), FixedPoint::new(-13, 10));
+    assert_eq!(FixedPoint::new(-125, 100).try_quantize(10, RoundingMode::HalfFloor).unwrap(), FixedPoint::new(-13, 10));
     assert_eq!(FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::Ceil).unwrap(), FixedPoint::new(-12, 10));
     assert_eq!(FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::AwayFromZero).unwrap(), FixedPoint::new(-13, 10));
 }
@@ -241,7 +250,7 @@ fn try_quantize_reports_overflow_when_upscaling() {
 fn try_normalize_to_matches_try_quantize_on_success() {
     let value = FixedPoint::new(125, 100);
     assert_eq!(value.try_normalize_to(10, RoundingMode::HalfEven).unwrap(), value.try_quantize(10, RoundingMode::HalfEven).unwrap());
-    assert_eq!(value.try_normalize_to(1_000, RoundingMode::HalfUp).unwrap(), value.try_quantize(1_000, RoundingMode::HalfUp).unwrap());
+    assert_eq!(value.try_normalize_to(1_000, RoundingMode::HalfCeil).unwrap(), value.try_quantize(1_000, RoundingMode::HalfCeil).unwrap());
     assert_eq!(
         FixedPoint::new(-129, 100).try_normalize_to(10, RoundingMode::AwayFromZero).unwrap(),
         FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::AwayFromZero).unwrap()
@@ -259,7 +268,7 @@ fn try_normalize_to_matches_try_quantize_on_error() {
 #[test]
 fn normalize_to_matches_quantize_on_success() {
     let value = FixedPoint::new(125, 100);
-    assert_eq!(value.normalize_to(10, RoundingMode::HalfUp), value.quantize(10, RoundingMode::HalfUp));
+    assert_eq!(value.normalize_to(10, RoundingMode::HalfCeil), value.quantize(10, RoundingMode::HalfCeil));
     assert_eq!(FixedPoint::new(-129, 100).normalize_to(10, RoundingMode::Ceil), FixedPoint::new(-129, 100).quantize(10, RoundingMode::Ceil));
 }
 
@@ -300,9 +309,19 @@ fn try_add_mut_success_and_error_leave_expected_state() {
     let mut value = FixedPoint::new(100, 100);
     value.try_add_mut(&FixedPoint::new(23, 100)).unwrap();
     assert_eq!(value, FixedPoint::new(123, 100));
-    let err = value.try_add_mut(&FixedPoint::new(1, 1000)).unwrap_err();
-    assert!(matches!(err, FixedPointError::IncompatibleScale { operation: "add", expected: 100, got: 1000 }));
-    assert_eq!(value, FixedPoint::new(123, 100));
+
+    // Cross-scale add upgrades to the higher scale.
+    value.try_add_mut(&FixedPoint::new(1, 1000)).unwrap();
+    assert_eq!(value, FixedPoint::new(1231, 1000));
+
+    // Overflow during upscaling keeps the original value unchanged.
+    let mut overflow = FixedPoint::new(i64::MAX, 1);
+    let err = overflow
+        .try_add_mut(&FixedPoint::new(1, 1_000_000_000_000_000_000))
+        .unwrap_err();
+    assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+    assert_eq!(overflow, FixedPoint::new(i64::MAX, 1));
+
     let mut overflow = FixedPoint::new(i64::MAX, 100);
     let err = overflow.try_add_mut(&FixedPoint::new(1, 100)).unwrap_err();
     assert!(matches!(err, FixedPointError::ArithmeticOverflow));
@@ -314,9 +333,19 @@ fn try_sub_mut_success_and_error_leave_expected_state() {
     let mut value = FixedPoint::new(200, 100);
     value.try_sub_mut(&FixedPoint::new(23, 100)).unwrap();
     assert_eq!(value, FixedPoint::new(177, 100));
-    let err = value.try_sub_mut(&FixedPoint::new(1, 1000)).unwrap_err();
-    assert!(matches!(err, FixedPointError::IncompatibleScale { operation: "sub", expected: 100, got: 1000 }));
-    assert_eq!(value, FixedPoint::new(177, 100));
+
+    // Cross-scale sub upgrades to the higher scale.
+    value.try_sub_mut(&FixedPoint::new(1, 1000)).unwrap();
+    assert_eq!(value, FixedPoint::new(1769, 1000));
+
+    // Overflow during upscaling keeps the original value unchanged.
+    let mut overflow = FixedPoint::new(i64::MIN, 1);
+    let err = overflow
+        .try_sub_mut(&FixedPoint::new(1, 1_000_000_000_000_000_000))
+        .unwrap_err();
+    assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+    assert_eq!(overflow, FixedPoint::new(i64::MIN, 1));
+
     let mut overflow = FixedPoint::new(i64::MIN, 100);
     let err = overflow.try_sub_mut(&FixedPoint::new(1, 100)).unwrap_err();
     assert!(matches!(err, FixedPointError::ArithmeticOverflow));
@@ -418,7 +447,7 @@ fn div_i32_returns_expected_result() {
 #[test]
 fn try_to_fixed_point_reports_rounding_overflow() {
     let result = DivResult { quotient: FixedPoint::new(i64::MAX, 1), rem: 1, div: 2 };
-    assert!(matches!(result.try_to_fixed_point(RoundingMode::HalfUp).unwrap_err(), FixedPointError::ArithmeticOverflow));
+    assert!(matches!(result.try_to_fixed_point(RoundingMode::HalfCeil).unwrap_err(), FixedPointError::ArithmeticOverflow));
     assert!(matches!(result.try_to_fixed_point(RoundingMode::Ceil).unwrap_err(), FixedPointError::ArithmeticOverflow));
     assert_eq!(result.try_to_fixed_point(RoundingMode::Floor), Ok(FixedPoint::new(i64::MAX, 1)));
 }
@@ -426,9 +455,9 @@ fn try_to_fixed_point_reports_rounding_overflow() {
 #[test]
 fn rounding_matrix_positive_values() {
     let cases = [
-        (5_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfUp, 3), (RoundingMode::HalfDown, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
-        (3_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfUp, 2), (RoundingMode::HalfDown, 1), (RoundingMode::Floor, 1), (RoundingMode::Ceil, 2), (RoundingMode::TowardZero, 1), (RoundingMode::AwayFromZero, 2)]),
-        (7_i64, 3_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfUp, 2), (RoundingMode::HalfDown, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
+        (5_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 3), (RoundingMode::HalfFloor, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
+        (3_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 2), (RoundingMode::HalfFloor, 1), (RoundingMode::Floor, 1), (RoundingMode::Ceil, 2), (RoundingMode::TowardZero, 1), (RoundingMode::AwayFromZero, 2)]),
+        (7_i64, 3_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 2), (RoundingMode::HalfFloor, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
     ];
     for (atoms, div, expected_modes) in cases {
         let result = FixedPoint::new(atoms, 1).try_div_i64(div).unwrap();
@@ -441,9 +470,9 @@ fn rounding_matrix_positive_values() {
 #[test]
 fn rounding_matrix_negative_values() {
     let cases = [
-        (-5_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfUp, -2), (RoundingMode::HalfDown, -3), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
-        (-3_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfUp, -1), (RoundingMode::HalfDown, -2), (RoundingMode::Floor, -2), (RoundingMode::Ceil, -1), (RoundingMode::TowardZero, -1), (RoundingMode::AwayFromZero, -2)]),
-        (-7_i64, 3_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfUp, -2), (RoundingMode::HalfDown, -2), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
+        (-5_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -2), (RoundingMode::HalfFloor, -3), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
+        (-3_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -1), (RoundingMode::HalfFloor, -2), (RoundingMode::Floor, -2), (RoundingMode::Ceil, -1), (RoundingMode::TowardZero, -1), (RoundingMode::AwayFromZero, -2)]),
+        (-7_i64, 3_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -2), (RoundingMode::HalfFloor, -2), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
     ];
     for (atoms, div, expected_modes) in cases {
         let result = FixedPoint::new(atoms, 1).try_div_i64(div).unwrap();

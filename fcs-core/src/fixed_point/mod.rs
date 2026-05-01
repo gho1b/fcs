@@ -1,8 +1,11 @@
 use crate::error::FixedPointError;
 use core::fmt;
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 mod division;
+pub(crate) mod helper;
+mod multiplication;
 #[cfg(test)]
 mod tests;
 
@@ -34,28 +37,69 @@ pub(crate) fn valid_scale(scale: i64) -> bool {
     VALID_SCALES.binary_search(&scale).is_ok()
 }
 
+/// # Rounding Mode
+///
+/// ## Logical Matrix
+///
+/// | Mode               | `1.2` | `1.5` | `1.8` | `-1.2` | `-1.5` | `-1.8` |
+/// | ------------------ | ----: | ----: | ----: | -----: | -----: | -----: |
+/// | `Floor`            |   `1` |   `1` |   `1` |   `-2` |   `-2` |   `-2` |
+/// | `Ceil`             |   `2` |   `2` |   `2` |   `-1` |   `-1` |   `-1` |
+/// | `TowardZero`       |   `1` |   `1` |   `1` |   `-1` |   `-1` |   `-1` |
+/// | `AwayFromZero`     |   `2` |   `2` |   `2` |   `-2` |   `-2` |   `-2` |
+/// | `HalfEven`         |   `1` |   `2` |   `2` |   `-1` |   `-2` |   `-2` |
+/// | `HalfCeil`         |   `1` |   `2` |   `2` |   `-1` |   `-1` |   `-2` |
+/// | `HalfFloor`        |   `1` |   `1` |   `2` |   `-1` |   `-2` |   `-2` |
+/// | `HalfAwayFromZero` |   `1` |   `2` |   `2` |   `-1` |   `-2` |   `-2` |
+/// | `HalfTowardZero`   |   `1` |   `1` |   `2` |   `-1` |   `-1` |   `-2` |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum RoundingMode {
     /// Round to nearest; ties go to the even result.
+    ///
+    /// ToNearestTiesToEven
     ///
     /// Often called banker's rounding or unbiased rounding.
     #[default]
     HalfEven,
     /// Round to nearest; ties go to the greater numeric (toward +∞)
     ///
+    /// ToNearestTiesTowardPositiveInfinity
+    ///
     /// Examples:
     /// - `2.5 -> 3`
     /// - `-2.5 -> -2`
-    HalfUp,
+    HalfCeil,
     /// Round to nearest; ties go to the smaller numeric (toward -∞)
+    ///
+    /// ToNearestTiesTowardNegativeInfinity
     ///
     /// Examples:
     /// - `2.5 -> 2`
     /// - `-2.5 -> -3`
-    HalfDown,
+    HalfFloor,
+    /// Round to nearest; ties go toward zero.
+    ///
+    /// ToNearestTiesTowardZero
+    ///
+    /// Examples:
+    /// - `2.5 -> 2`
+    /// - `-2.5 -> -2`
+    HalfTowardsZero,
+    /// Round to nearest; ties go away from zero.
+    ///
+    /// ToNearestTiesAwayFromZero
+    ///
+    /// Examples:
+    /// - `2.5 -> 3`
+    /// - `-2.5 -> -3`
+    HalfAwayFromZero,
     /// Round toward negative infinity.
+    ///
+    /// TowardNegativeInfinity
     Floor,
     /// Round toward positive infinity.
+    ///
+    /// TowardPositiveInfinity
     Ceil,
     /// Round toward zero.
     TowardZero,
@@ -182,7 +226,7 @@ impl FixedPoint {
         let factor = self.scale / target_scale;
         debug_assert_eq!(self.scale % target_scale, 0);
 
-        let (atoms, rem, div) = division::checked_div_rem_euclid_signed(self.atoms, factor)
+        let (atoms, rem, div) = helper::checked_div_rem_euclid_signed_i64(self.atoms, factor)
             .ok_or(FixedPointError::ArithmeticOverflow)?;
 
         let result = DivResult {
@@ -254,26 +298,43 @@ impl FixedPoint {
 }
 
 impl FixedPoint {
-    #[cold]
-    #[inline(never)]
-    fn err_incompatible(op: &'static str, expected: i64, got: i64) -> FixedPointError {
-        FixedPointError::IncompatibleScale {
-            operation: op,
-            expected,
-            got,
+    #[inline]
+    fn checked_upscale_atoms(
+        atoms: i64,
+        from_scale: i64,
+        to_scale: i64,
+    ) -> Result<i64, FixedPointError> {
+        debug_assert!(to_scale >= from_scale);
+        debug_assert_eq!(to_scale % from_scale, 0);
+        if from_scale == to_scale {
+            return Ok(atoms);
         }
+        let factor = to_scale / from_scale;
+        atoms
+            .checked_mul(factor)
+            .ok_or(FixedPointError::ArithmeticOverflow)
     }
 
     #[inline]
     pub fn try_add_mut(&mut self, other: &Self) -> Result<(), FixedPointError> {
-        if !self.same_scale(other) {
-            return Err(Self::err_incompatible("add", self.scale, other.scale));
+        if self.same_scale(other) {
+            self.atoms = self
+                .atoms
+                .checked_add(other.atoms)
+                .ok_or(FixedPointError::ArithmeticOverflow)?;
+            return Ok(());
         }
 
-        self.atoms = self
-            .atoms
-            .checked_add(other.atoms)
+        let target_scale = self.scale.max(other.scale);
+
+        let lhs_atoms = Self::checked_upscale_atoms(self.atoms, self.scale, target_scale)?;
+
+        let rhs_atoms = Self::checked_upscale_atoms(other.atoms, other.scale, target_scale)?;
+
+        self.atoms = lhs_atoms
+            .checked_add(rhs_atoms)
             .ok_or(FixedPointError::ArithmeticOverflow)?;
+        self.scale = target_scale;
 
         Ok(())
     }
@@ -287,14 +348,24 @@ impl FixedPoint {
 
     #[inline]
     pub fn try_sub_mut(&mut self, other: &Self) -> Result<(), FixedPointError> {
-        if !self.same_scale(other) {
-            return Err(Self::err_incompatible("sub", self.scale, other.scale));
+        if self.same_scale(other) {
+            self.atoms = self
+                .atoms
+                .checked_sub(other.atoms)
+                .ok_or(FixedPointError::ArithmeticOverflow)?;
+            return Ok(());
         }
 
-        self.atoms = self
-            .atoms
-            .checked_sub(other.atoms)
+        let target_scale = self.scale.max(other.scale);
+
+        let lhs_atoms = Self::checked_upscale_atoms(self.atoms, self.scale, target_scale)?;
+
+        let rhs_atoms = Self::checked_upscale_atoms(other.atoms, other.scale, target_scale)?;
+
+        self.atoms = lhs_atoms
+            .checked_sub(rhs_atoms)
             .ok_or(FixedPointError::ArithmeticOverflow)?;
+        self.scale = target_scale;
 
         Ok(())
     }
@@ -372,5 +443,52 @@ impl Neg for FixedPoint {
     fn neg(self) -> Self::Output {
         self.checked_neg()
             .unwrap_or_else(|| panic!("arithmetic overflow"))
+    }
+}
+
+impl Sum for FixedPoint {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut total_atoms: i128 = 0;
+        let mut current_scale: i64 = 0;
+
+        for f in iter {
+            if current_scale == 0 {
+                current_scale = f.scale;
+                total_atoms = f.atoms as i128;
+                continue;
+            }
+
+            if f.scale == current_scale {
+                total_atoms += f.atoms as i128;
+                continue;
+            }
+
+            if f.scale > current_scale {
+                debug_assert_eq!(f.scale % current_scale, 0);
+                let factor = (f.scale / current_scale) as i128;
+                total_atoms = total_atoms
+                    .checked_mul(factor)
+                    .unwrap_or_else(|| panic!("{}", FixedPointError::ArithmeticOverflow));
+                total_atoms += f.atoms as i128;
+                current_scale = f.scale;
+            } else {
+                debug_assert_eq!(current_scale % f.scale, 0);
+                let factor = (current_scale / f.scale) as i128;
+                let up = (f.atoms as i128)
+                    .checked_mul(factor)
+                    .unwrap_or_else(|| panic!("{}", FixedPointError::ArithmeticOverflow));
+                total_atoms += up;
+            }
+        }
+
+        if current_scale == 0 {
+            return FixedPoint::new(0, 1);
+        }
+
+        let atoms: i64 = total_atoms
+            .try_into()
+            .unwrap_or_else(|_| panic!("{}", FixedPointError::ArithmeticOverflow));
+
+        FixedPoint::new(atoms, current_scale)
     }
 }

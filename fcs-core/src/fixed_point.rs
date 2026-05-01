@@ -113,6 +113,7 @@ impl FixedPoint {
         self.scale
     }
 
+    #[inline]
     pub fn try_rescale_exact(&self, target_scale: i64) -> Result<Self, FixedPointError> {
         if !valid_scale(target_scale) {
             return Err(FixedPointError::InvalidScale {
@@ -147,6 +148,49 @@ impl FixedPoint {
         }
 
         Ok(Self::new(self.atoms / factor, target_scale))
+    }
+
+    #[inline]
+    pub fn rescale_exact(&self, target_scale: i64) -> Self {
+        self.try_rescale_exact(target_scale)
+            .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    #[inline]
+    pub fn try_quantize(
+        &self,
+        target_scale: i64,
+        rounding_mode: RoundingMode,
+    ) -> Result<Self, FixedPointError> {
+        if !valid_scale(target_scale) {
+            return Err(FixedPointError::InvalidScale {
+                scale: target_scale,
+            });
+        }
+
+        if target_scale >= self.scale {
+            return self.try_rescale_exact(target_scale);
+        }
+
+        let factor = self.scale / target_scale;
+        debug_assert_eq!(self.scale % target_scale, 0);
+
+        let (atoms, rem, div) = checked_div_rem_euclid_signed(self.atoms, factor)
+            .ok_or(FixedPointError::ArithmeticOverflow)?;
+
+        let result = DivResult {
+            quotient: Self::new(atoms, target_scale),
+            rem,
+            div,
+        };
+
+        result.try_to_fixed_point(rounding_mode)
+    }
+
+    #[inline]
+    pub fn quantize(&self, target_scale: i64, rounding_mode: RoundingMode) -> Self {
+        self.try_quantize(target_scale, rounding_mode)
+            .unwrap_or_else(|err| panic!("{err}"))
     }
 
     /// Bagian unit (whole/major). Contoh: 1200/100 => 12
@@ -421,7 +465,8 @@ impl DivResult {
     }
 
     pub fn to_fixed_point(&self, mode: RoundingMode) -> FixedPoint {
-        self.try_to_fixed_point(mode).unwrap_or_else(|e| panic!("{e}"))
+        self.try_to_fixed_point(mode)
+            .unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
@@ -602,7 +647,10 @@ mod test {
 
     #[test]
     fn display_handles_i64_min() {
-        assert_eq!(FixedPoint::new(i64::MIN, 1).to_string(), "-9223372036854775808");
+        assert_eq!(
+            FixedPoint::new(i64::MIN, 1).to_string(),
+            "-9223372036854775808"
+        );
         assert_eq!(
             FixedPoint::new(i64::MIN, 100).to_string(),
             "-92233720368547758.08"
@@ -657,11 +705,15 @@ mod test {
             FixedPoint::new(1_230, 1_000)
         );
         assert_eq!(
-            FixedPoint::new(1_230, 1_000).try_rescale_exact(100).unwrap(),
+            FixedPoint::new(1_230, 1_000)
+                .try_rescale_exact(100)
+                .unwrap(),
             FixedPoint::new(123, 100)
         );
         assert_eq!(
-            FixedPoint::new(-1_230, 1_000).try_rescale_exact(100).unwrap(),
+            FixedPoint::new(-1_230, 1_000)
+                .try_rescale_exact(100)
+                .unwrap(),
             FixedPoint::new(-123, 100)
         );
         assert_eq!(
@@ -694,6 +746,97 @@ mod test {
     fn try_rescale_exact_reports_overflow_when_upscaling() {
         let err = FixedPoint::new(i64::MAX, 1)
             .try_rescale_exact(10)
+            .unwrap_err();
+        assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+    }
+
+    #[test]
+    fn try_quantize_preserves_or_increases_scale_exactly() {
+        assert_eq!(
+            FixedPoint::new(123, 100)
+                .try_quantize(100, RoundingMode::HalfEven)
+                .unwrap(),
+            FixedPoint::new(123, 100)
+        );
+        assert_eq!(
+            FixedPoint::new(123, 100)
+                .try_quantize(1_000, RoundingMode::HalfEven)
+                .unwrap(),
+            FixedPoint::new(1_230, 1_000)
+        );
+    }
+
+    #[test]
+    fn try_quantize_rounds_positive_values() {
+        assert_eq!(
+            FixedPoint::new(125, 100)
+                .try_quantize(10, RoundingMode::HalfEven)
+                .unwrap(),
+            FixedPoint::new(12, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(125, 100)
+                .try_quantize(10, RoundingMode::HalfUp)
+                .unwrap(),
+            FixedPoint::new(13, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(129, 100)
+                .try_quantize(10, RoundingMode::Ceil)
+                .unwrap(),
+            FixedPoint::new(13, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(129, 100)
+                .try_quantize(10, RoundingMode::Floor)
+                .unwrap(),
+            FixedPoint::new(12, 10)
+        );
+    }
+
+    #[test]
+    fn try_quantize_rounds_negative_values() {
+        assert_eq!(
+            FixedPoint::new(-125, 100)
+                .try_quantize(10, RoundingMode::HalfEven)
+                .unwrap(),
+            FixedPoint::new(-12, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(-125, 100)
+                .try_quantize(10, RoundingMode::HalfDown)
+                .unwrap(),
+            FixedPoint::new(-13, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(-129, 100)
+                .try_quantize(10, RoundingMode::Ceil)
+                .unwrap(),
+            FixedPoint::new(-12, 10)
+        );
+        assert_eq!(
+            FixedPoint::new(-129, 100)
+                .try_quantize(10, RoundingMode::AwayFromZero)
+                .unwrap(),
+            FixedPoint::new(-13, 10)
+        );
+    }
+
+    #[test]
+    fn try_quantize_rejects_invalid_target_scale() {
+        let value = FixedPoint::new(123, 100);
+
+        let err = value.try_quantize(0, RoundingMode::HalfEven).unwrap_err();
+        assert!(matches!(err, FixedPointError::InvalidScale { scale: 0 }));
+
+        let err = value.try_quantize(12, RoundingMode::HalfEven).unwrap_err();
+        assert!(matches!(err, FixedPointError::InvalidScale { scale: 12 }));
+    }
+
+    #[test]
+    fn try_quantize_reports_overflow_when_upscaling() {
+        let err = FixedPoint::new(i64::MAX, 1)
+            .try_quantize(10, RoundingMode::HalfEven)
             .unwrap_err();
         assert!(matches!(err, FixedPointError::ArithmeticOverflow));
     }

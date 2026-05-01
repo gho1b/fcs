@@ -190,7 +190,22 @@ impl FixedPoint {
     #[inline]
     pub fn quantize(&self, target_scale: i64, rounding_mode: RoundingMode) -> Self {
         self.try_quantize(target_scale, rounding_mode)
-            .unwrap_or_else(|err| panic!("{err}"))
+            .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    #[inline]
+    pub fn try_normalize_to(
+        &self,
+        target_scale: i64,
+        rounding_mode: RoundingMode,
+    ) -> Result<Self, FixedPointError> {
+        self.try_quantize(target_scale, rounding_mode)
+    }
+
+    #[inline]
+    pub fn normalize_to(&self, target_scale: i64, rounding_mode: RoundingMode) -> Self {
+        self.try_normalize_to(target_scale, rounding_mode)
+            .unwrap_or_else(|e| panic!("{e}"))
     }
 
     /// Bagian unit (whole/major). Contoh: 1200/100 => 12
@@ -751,6 +766,24 @@ mod test {
     }
 
     #[test]
+    fn rescale_exact_matches_try_rescale_exact_on_success() {
+        assert_eq!(
+            FixedPoint::new(123, 100).rescale_exact(1_000),
+            FixedPoint::new(123, 100).try_rescale_exact(1_000).unwrap()
+        );
+        assert_eq!(
+            FixedPoint::new(-1_230, 1_000).rescale_exact(100),
+            FixedPoint::new(-1_230, 1_000).try_rescale_exact(100).unwrap()
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "non-exact rescale from 100 to 10")]
+    fn rescale_exact_panics_on_lossy_downscale() {
+        let _ = FixedPoint::new(123, 100).rescale_exact(10);
+    }
+
+    #[test]
     fn try_quantize_preserves_or_increases_scale_exactly() {
         assert_eq!(
             FixedPoint::new(123, 100)
@@ -839,6 +872,60 @@ mod test {
             .try_quantize(10, RoundingMode::HalfEven)
             .unwrap_err();
         assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+    }
+
+    #[test]
+    fn try_normalize_to_matches_try_quantize_on_success() {
+        let value = FixedPoint::new(125, 100);
+
+        assert_eq!(
+            value.try_normalize_to(10, RoundingMode::HalfEven).unwrap(),
+            value.try_quantize(10, RoundingMode::HalfEven).unwrap()
+        );
+        assert_eq!(
+            value.try_normalize_to(1_000, RoundingMode::HalfUp).unwrap(),
+            value.try_quantize(1_000, RoundingMode::HalfUp).unwrap()
+        );
+        assert_eq!(
+            FixedPoint::new(-129, 100)
+                .try_normalize_to(10, RoundingMode::AwayFromZero)
+                .unwrap(),
+            FixedPoint::new(-129, 100)
+                .try_quantize(10, RoundingMode::AwayFromZero)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn try_normalize_to_matches_try_quantize_on_error() {
+        let value = FixedPoint::new(123, 100);
+
+        let err = value.try_normalize_to(12, RoundingMode::HalfEven).unwrap_err();
+        assert!(matches!(err, FixedPointError::InvalidScale { scale: 12 }));
+
+        let err = FixedPoint::new(i64::MAX, 1)
+            .try_normalize_to(10, RoundingMode::HalfEven)
+            .unwrap_err();
+        assert!(matches!(err, FixedPointError::ArithmeticOverflow));
+    }
+
+    #[test]
+    fn normalize_to_matches_quantize_on_success() {
+        let value = FixedPoint::new(125, 100);
+        assert_eq!(
+            value.normalize_to(10, RoundingMode::HalfUp),
+            value.quantize(10, RoundingMode::HalfUp)
+        );
+        assert_eq!(
+            FixedPoint::new(-129, 100).normalize_to(10, RoundingMode::Ceil),
+            FixedPoint::new(-129, 100).quantize(10, RoundingMode::Ceil)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid scale: got 12")]
+    fn normalize_to_panics_on_invalid_scale() {
+        let _ = FixedPoint::new(123, 100).normalize_to(12, RoundingMode::HalfEven);
     }
 
     #[test]

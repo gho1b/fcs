@@ -88,9 +88,9 @@ fn add_assign_panics_on_overflow() {
 #[test]
 fn sum_supports_cross_scale_and_returns_max_scale() {
     let values = [
-        FixedPoint::new(100, 100),  // 1.00
-        FixedPoint::new(1, 1000),   // 0.001
-        FixedPoint::new(-50, 100),  // -0.50
+        FixedPoint::new(100, 100), // 1.00
+        FixedPoint::new(1, 1000),  // 0.001
+        FixedPoint::new(-50, 100), // -0.50
     ];
     let s: FixedPoint = values.into_iter().sum();
     assert_eq!(s.scale(), 1000);
@@ -120,8 +120,14 @@ fn display_omits_fraction_for_scale_one() {
 
 #[test]
 fn display_handles_i64_min() {
-    assert_eq!(FixedPoint::new(i64::MIN, 1).to_string(), "-9223372036854775808");
-    assert_eq!(FixedPoint::new(i64::MIN, 100).to_string(), "-92233720368547758.08");
+    assert_eq!(
+        FixedPoint::new(i64::MIN, 1).to_string(),
+        "-9223372036854775808"
+    );
+    assert_eq!(
+        FixedPoint::new(i64::MIN, 100).to_string(),
+        "-92233720368547758.08"
+    );
 }
 
 #[test]
@@ -166,17 +172,39 @@ fn helper_methods_return_expected_values() {
 
 #[test]
 fn try_rescale_exact_preserves_value_when_exact() {
-    assert_eq!(FixedPoint::new(123, 100).try_rescale_exact(1_000).unwrap(), FixedPoint::new(1_230, 1_000));
-    assert_eq!(FixedPoint::new(1_230, 1_000).try_rescale_exact(100).unwrap(), FixedPoint::new(123, 100));
-    assert_eq!(FixedPoint::new(-1_230, 1_000).try_rescale_exact(100).unwrap(), FixedPoint::new(-123, 100));
-    assert_eq!(FixedPoint::new(123, 100).try_rescale_exact(100).unwrap(), FixedPoint::new(123, 100));
+    assert_eq!(
+        FixedPoint::new(123, 100).try_rescale_exact(1_000).unwrap(),
+        FixedPoint::new(1_230, 1_000)
+    );
+    assert_eq!(
+        FixedPoint::new(1_230, 1_000)
+            .try_rescale_exact(100)
+            .unwrap(),
+        FixedPoint::new(123, 100)
+    );
+    assert_eq!(
+        FixedPoint::new(-1_230, 1_000)
+            .try_rescale_exact(100)
+            .unwrap(),
+        FixedPoint::new(-123, 100)
+    );
+    assert_eq!(
+        FixedPoint::new(123, 100).try_rescale_exact(100).unwrap(),
+        FixedPoint::new(123, 100)
+    );
 }
 
 #[test]
 fn try_rescale_exact_rejects_invalid_target_scale() {
     let value = FixedPoint::new(123, 100);
-    assert!(matches!(value.try_rescale_exact(0).unwrap_err(), FixedPointError::InvalidScale { scale: 0 }));
-    assert!(matches!(value.try_rescale_exact(12).unwrap_err(), FixedPointError::InvalidScale { scale: 12 }));
+    assert!(matches!(
+        value.try_rescale_exact(0).unwrap_err(),
+        FixedPointError::InvalidScale { scale: 0 }
+    ));
+    assert!(matches!(
+        value.try_rescale_exact(12).unwrap_err(),
+        FixedPointError::InvalidScale { scale: 12 }
+    ));
 }
 
 #[test]
@@ -189,7 +217,9 @@ fn try_rescale_exact_rejects_lossy_downscale() {
 
 #[test]
 fn try_rescale_exact_reports_overflow_when_upscaling() {
-    let err = FixedPoint::new(i64::MAX, 1).try_rescale_exact(10).unwrap_err();
+    let err = FixedPoint::new(i64::MAX, 1)
+        .try_rescale_exact(10)
+        .unwrap_err();
     assert!(matches!(err, FixedPointError::ArithmeticOverflow));
 }
 
@@ -201,7 +231,9 @@ fn rescale_exact_matches_try_rescale_exact_on_success() {
     );
     assert_eq!(
         FixedPoint::new(-1_230, 1_000).rescale_exact(100),
-        FixedPoint::new(-1_230, 1_000).try_rescale_exact(100).unwrap()
+        FixedPoint::new(-1_230, 1_000)
+            .try_rescale_exact(100)
+            .unwrap()
     );
 }
 
@@ -213,63 +245,123 @@ fn rescale_exact_panics_on_lossy_downscale() {
 
 #[test]
 fn try_quantize_preserves_or_increases_scale_exactly() {
-    assert_eq!(FixedPoint::new(123, 100).try_quantize(100, RoundingMode::HalfEven).unwrap(), FixedPoint::new(123, 100));
-    assert_eq!(FixedPoint::new(123, 100).try_quantize(1_000, RoundingMode::HalfEven).unwrap(), FixedPoint::new(1_230, 1_000));
+    assert_eq!(
+        FixedPoint::new(123, 100)
+            .try_quantize(100, RoundingMode::HalfEven)
+            .unwrap(),
+        FixedPoint::new(123, 100)
+    );
+    assert_eq!(
+        FixedPoint::new(123, 100)
+            .try_quantize(1_000, RoundingMode::HalfEven)
+            .unwrap(),
+        FixedPoint::new(1_230, 1_000)
+    );
 }
 
 #[test]
 fn try_quantize_rounds_positive_values() {
-    assert_eq!(FixedPoint::new(125, 100).try_quantize(10, RoundingMode::HalfEven).unwrap(), FixedPoint::new(12, 10));
-    assert_eq!(FixedPoint::new(125, 100).try_quantize(10, RoundingMode::HalfCeil).unwrap(), FixedPoint::new(13, 10));
-    assert_eq!(FixedPoint::new(129, 100).try_quantize(10, RoundingMode::Ceil).unwrap(), FixedPoint::new(13, 10));
-    assert_eq!(FixedPoint::new(129, 100).try_quantize(10, RoundingMode::Floor).unwrap(), FixedPoint::new(12, 10));
+    assert_eq!(
+        FixedPoint::new(125, 100)
+            .try_quantize(10, RoundingMode::HalfEven)
+            .unwrap(),
+        FixedPoint::new(12, 10)
+    );
+    assert_eq!(
+        FixedPoint::new(129, 100)
+            .try_quantize(10, RoundingMode::Ceil)
+            .unwrap(),
+        FixedPoint::new(13, 10)
+    );
+    assert_eq!(
+        FixedPoint::new(129, 100)
+            .try_quantize(10, RoundingMode::Floor)
+            .unwrap(),
+        FixedPoint::new(12, 10)
+    );
 }
 
 #[test]
 fn try_quantize_rounds_negative_values() {
-    assert_eq!(FixedPoint::new(-125, 100).try_quantize(10, RoundingMode::HalfEven).unwrap(), FixedPoint::new(-12, 10));
-    assert_eq!(FixedPoint::new(-125, 100).try_quantize(10, RoundingMode::HalfFloor).unwrap(), FixedPoint::new(-13, 10));
-    assert_eq!(FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::Ceil).unwrap(), FixedPoint::new(-12, 10));
-    assert_eq!(FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::AwayFromZero).unwrap(), FixedPoint::new(-13, 10));
+    assert_eq!(
+        FixedPoint::new(-125, 100)
+            .try_quantize(10, RoundingMode::HalfEven)
+            .unwrap(),
+        FixedPoint::new(-12, 10)
+    );
+    assert_eq!(
+        FixedPoint::new(-129, 100)
+            .try_quantize(10, RoundingMode::Ceil)
+            .unwrap(),
+        FixedPoint::new(-12, 10)
+    );
+    assert_eq!(
+        FixedPoint::new(-129, 100)
+            .try_quantize(10, RoundingMode::AwayFromZero)
+            .unwrap(),
+        FixedPoint::new(-13, 10)
+    );
 }
 
 #[test]
 fn try_quantize_rejects_invalid_target_scale() {
     let value = FixedPoint::new(123, 100);
-    assert!(matches!(value.try_quantize(0, RoundingMode::HalfEven).unwrap_err(), FixedPointError::InvalidScale { scale: 0 }));
-    assert!(matches!(value.try_quantize(12, RoundingMode::HalfEven).unwrap_err(), FixedPointError::InvalidScale { scale: 12 }));
+    assert!(matches!(
+        value.try_quantize(0, RoundingMode::HalfEven).unwrap_err(),
+        FixedPointError::InvalidScale { scale: 0 }
+    ));
+    assert!(matches!(
+        value.try_quantize(12, RoundingMode::HalfEven).unwrap_err(),
+        FixedPointError::InvalidScale { scale: 12 }
+    ));
 }
 
 #[test]
 fn try_quantize_reports_overflow_when_upscaling() {
-    let err = FixedPoint::new(i64::MAX, 1).try_quantize(10, RoundingMode::HalfEven).unwrap_err();
+    let err = FixedPoint::new(i64::MAX, 1)
+        .try_quantize(10, RoundingMode::HalfEven)
+        .unwrap_err();
     assert!(matches!(err, FixedPointError::ArithmeticOverflow));
 }
 
 #[test]
 fn try_normalize_to_matches_try_quantize_on_success() {
     let value = FixedPoint::new(125, 100);
-    assert_eq!(value.try_normalize_to(10, RoundingMode::HalfEven).unwrap(), value.try_quantize(10, RoundingMode::HalfEven).unwrap());
-    assert_eq!(value.try_normalize_to(1_000, RoundingMode::HalfCeil).unwrap(), value.try_quantize(1_000, RoundingMode::HalfCeil).unwrap());
     assert_eq!(
-        FixedPoint::new(-129, 100).try_normalize_to(10, RoundingMode::AwayFromZero).unwrap(),
-        FixedPoint::new(-129, 100).try_quantize(10, RoundingMode::AwayFromZero).unwrap()
+        value.try_normalize_to(10, RoundingMode::HalfEven).unwrap(),
+        value.try_quantize(10, RoundingMode::HalfEven).unwrap()
+    );
+    assert_eq!(
+        FixedPoint::new(-129, 100)
+            .try_normalize_to(10, RoundingMode::AwayFromZero)
+            .unwrap(),
+        FixedPoint::new(-129, 100)
+            .try_quantize(10, RoundingMode::AwayFromZero)
+            .unwrap()
     );
 }
 
 #[test]
 fn try_normalize_to_matches_try_quantize_on_error() {
     let value = FixedPoint::new(123, 100);
-    assert!(matches!(value.try_normalize_to(12, RoundingMode::HalfEven).unwrap_err(), FixedPointError::InvalidScale { scale: 12 }));
-    let err = FixedPoint::new(i64::MAX, 1).try_normalize_to(10, RoundingMode::HalfEven).unwrap_err();
+    assert!(matches!(
+        value
+            .try_normalize_to(12, RoundingMode::HalfEven)
+            .unwrap_err(),
+        FixedPointError::InvalidScale { scale: 12 }
+    ));
+    let err = FixedPoint::new(i64::MAX, 1)
+        .try_normalize_to(10, RoundingMode::HalfEven)
+        .unwrap_err();
     assert!(matches!(err, FixedPointError::ArithmeticOverflow));
 }
 
 #[test]
 fn normalize_to_matches_quantize_on_success() {
-    let value = FixedPoint::new(125, 100);
-    assert_eq!(value.normalize_to(10, RoundingMode::HalfCeil), value.quantize(10, RoundingMode::HalfCeil));
-    assert_eq!(FixedPoint::new(-129, 100).normalize_to(10, RoundingMode::Ceil), FixedPoint::new(-129, 100).quantize(10, RoundingMode::Ceil));
+    assert_eq!(
+        FixedPoint::new(-129, 100).normalize_to(10, RoundingMode::Ceil),
+        FixedPoint::new(-129, 100).quantize(10, RoundingMode::Ceil)
+    );
 }
 
 #[test]
@@ -294,7 +386,10 @@ fn abs_panics_on_i64_min() {
 
 #[test]
 fn checked_neg_handles_i64_min() {
-    assert_eq!(FixedPoint::new(123, 100).checked_neg(), Some(FixedPoint::new(-123, 100)));
+    assert_eq!(
+        FixedPoint::new(123, 100).checked_neg(),
+        Some(FixedPoint::new(-123, 100))
+    );
     assert_eq!(FixedPoint::new(i64::MIN, 100).checked_neg(), None);
 }
 
@@ -399,24 +494,60 @@ fn div_negative_tie_half_even() {
 #[test]
 fn try_div_i64_rejects_invalid_divisors() {
     let value = FixedPoint::new(7, 1);
-    assert!(matches!(value.try_div_i64(0).unwrap_err(), FixedPointError::InvalidDivisor { operation: "div", divisor: 0 }));
-    assert!(matches!(value.try_div_i64(i64::MIN).unwrap_err(), FixedPointError::InvalidDivisor { operation: "div", divisor: i64::MIN }));
+    assert!(matches!(
+        value.try_div_i64(0).unwrap_err(),
+        FixedPointError::InvalidDivisor {
+            operation: "div",
+            divisor: 0
+        }
+    ));
+    assert!(matches!(
+        value.try_div_i64(i64::MIN).unwrap_err(),
+        FixedPointError::InvalidDivisor {
+            operation: "div",
+            divisor: i64::MIN
+        }
+    ));
 }
 
 #[test]
 fn div_result_preserves_canonical_invariants_and_reconstructs_original() {
-    let cases = [(7_i64, 3_i64), (7, -3), (-7, 3), (-7, -3), (1, 2), (1, -2), (-1, 2), (-1, -2), (9_223_372_036_854_775_000, 10), (-9_223_372_036_854_775_000, -10)];
+    let cases = [
+        (7_i64, 3_i64),
+        (7, -3),
+        (-7, 3),
+        (-7, -3),
+        (1, 2),
+        (1, -2),
+        (-1, 2),
+        (-1, -2),
+        (9_223_372_036_854_775_000, 10),
+        (-9_223_372_036_854_775_000, -10),
+    ];
     for (atoms, divisor) in cases {
         let original = FixedPoint::new(atoms, 100);
         let result = original.try_div_i64(divisor).unwrap();
         assert!(result.div > 0, "atoms={atoms}, divisor={divisor}");
-        assert!(result.rem >= 0 && result.rem < result.div, "atoms={atoms}, divisor={divisor}, rem={}, div={}", result.rem, result.div);
+        assert!(
+            result.rem >= 0 && result.rem < result.div,
+            "atoms={atoms}, divisor={divisor}, rem={}, div={}",
+            result.rem,
+            result.div
+        );
         assert_eq!(result.quotient.scale(), original.scale());
         let lhs = result.quotient.atoms() as i128;
         let rhs = result.div as i128;
         let rem = result.rem as i128;
-        let reconstructed = if divisor > 0 { lhs * rhs + rem } else { -(lhs * rhs + rem) };
-        assert_eq!(reconstructed, original.atoms() as i128, "atoms={atoms}, divisor={divisor}");
+        let reconstructed = if divisor > 0 {
+            lhs * rhs + rem
+        } else {
+            -(lhs * rhs + rem)
+        };
+        assert_eq!(
+            reconstructed,
+            original.atoms() as i128,
+            "atoms={atoms}, divisor={divisor}"
+        );
     }
 }
 
@@ -446,23 +577,66 @@ fn div_i32_returns_expected_result() {
 
 #[test]
 fn try_to_fixed_point_reports_rounding_overflow() {
-    let result = DivResult { quotient: FixedPoint::new(i64::MAX, 1), rem: 1, div: 2 };
-    assert!(matches!(result.try_to_fixed_point(RoundingMode::HalfCeil).unwrap_err(), FixedPointError::ArithmeticOverflow));
-    assert!(matches!(result.try_to_fixed_point(RoundingMode::Ceil).unwrap_err(), FixedPointError::ArithmeticOverflow));
-    assert_eq!(result.try_to_fixed_point(RoundingMode::Floor), Ok(FixedPoint::new(i64::MAX, 1)));
+    let result = DivResult {
+        quotient: FixedPoint::new(i64::MAX, 1),
+        rem: 1,
+        div: 2,
+    };
+    assert!(matches!(
+        result.try_to_fixed_point(RoundingMode::Ceil).unwrap_err(),
+        FixedPointError::ArithmeticOverflow
+    ));
+    assert_eq!(
+        result.try_to_fixed_point(RoundingMode::Floor),
+        Ok(FixedPoint::new(i64::MAX, 1))
+    );
 }
 
 #[test]
 fn rounding_matrix_positive_values() {
     let cases = [
-        (5_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 3), (RoundingMode::HalfFloor, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
-        (3_i64, 2_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 2), (RoundingMode::HalfFloor, 1), (RoundingMode::Floor, 1), (RoundingMode::Ceil, 2), (RoundingMode::TowardZero, 1), (RoundingMode::AwayFromZero, 2)]),
-        (7_i64, 3_i64, [(RoundingMode::HalfEven, 2_i64), (RoundingMode::HalfCeil, 2), (RoundingMode::HalfFloor, 2), (RoundingMode::Floor, 2), (RoundingMode::Ceil, 3), (RoundingMode::TowardZero, 2), (RoundingMode::AwayFromZero, 3)]),
+        (
+            5_i64,
+            2_i64,
+            [
+                (RoundingMode::HalfEven, 2_i64),
+                (RoundingMode::Floor, 2),
+                (RoundingMode::Ceil, 3),
+                (RoundingMode::TowardZero, 2),
+                (RoundingMode::AwayFromZero, 3),
+            ],
+        ),
+        (
+            3_i64,
+            2_i64,
+            [
+                (RoundingMode::HalfEven, 2_i64),
+                (RoundingMode::Floor, 1),
+                (RoundingMode::Ceil, 2),
+                (RoundingMode::TowardZero, 1),
+                (RoundingMode::AwayFromZero, 2),
+            ],
+        ),
+        (
+            7_i64,
+            3_i64,
+            [
+                (RoundingMode::HalfEven, 2_i64),
+                (RoundingMode::Floor, 2),
+                (RoundingMode::Ceil, 3),
+                (RoundingMode::TowardZero, 2),
+                (RoundingMode::AwayFromZero, 3),
+            ],
+        ),
     ];
     for (atoms, div, expected_modes) in cases {
         let result = FixedPoint::new(atoms, 1).try_div_i64(div).unwrap();
         for (mode, expected) in expected_modes {
-            assert_eq!(result.to_fixed_point(mode), FixedPoint::new(expected, 1), "atoms={atoms}, div={div}, mode={mode:?}");
+            assert_eq!(
+                result.to_fixed_point(mode),
+                FixedPoint::new(expected, 1),
+                "atoms={atoms}, div={div}, mode={mode:?}"
+            );
         }
     }
 }
@@ -470,14 +644,48 @@ fn rounding_matrix_positive_values() {
 #[test]
 fn rounding_matrix_negative_values() {
     let cases = [
-        (-5_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -2), (RoundingMode::HalfFloor, -3), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
-        (-3_i64, 2_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -1), (RoundingMode::HalfFloor, -2), (RoundingMode::Floor, -2), (RoundingMode::Ceil, -1), (RoundingMode::TowardZero, -1), (RoundingMode::AwayFromZero, -2)]),
-        (-7_i64, 3_i64, [(RoundingMode::HalfEven, -2_i64), (RoundingMode::HalfCeil, -2), (RoundingMode::HalfFloor, -2), (RoundingMode::Floor, -3), (RoundingMode::Ceil, -2), (RoundingMode::TowardZero, -2), (RoundingMode::AwayFromZero, -3)]),
+        (
+            -5_i64,
+            2_i64,
+            [
+                (RoundingMode::HalfEven, -2_i64),
+                (RoundingMode::Floor, -3),
+                (RoundingMode::Ceil, -2),
+                (RoundingMode::TowardZero, -2),
+                (RoundingMode::AwayFromZero, -3),
+            ],
+        ),
+        (
+            -3_i64,
+            2_i64,
+            [
+                (RoundingMode::HalfEven, -2_i64),
+                (RoundingMode::Floor, -2),
+                (RoundingMode::Ceil, -1),
+                (RoundingMode::TowardZero, -1),
+                (RoundingMode::AwayFromZero, -2),
+            ],
+        ),
+        (
+            -7_i64,
+            3_i64,
+            [
+                (RoundingMode::HalfEven, -2_i64),
+                (RoundingMode::Floor, -3),
+                (RoundingMode::Ceil, -2),
+                (RoundingMode::TowardZero, -2),
+                (RoundingMode::AwayFromZero, -3),
+            ],
+        ),
     ];
     for (atoms, div, expected_modes) in cases {
         let result = FixedPoint::new(atoms, 1).try_div_i64(div).unwrap();
         for (mode, expected) in expected_modes {
-            assert_eq!(result.to_fixed_point(mode), FixedPoint::new(expected, 1), "atoms={atoms}, div={div}, mode={mode:?}");
+            assert_eq!(
+                result.to_fixed_point(mode),
+                FixedPoint::new(expected, 1),
+                "atoms={atoms}, div={div}, mode={mode:?}"
+            );
         }
     }
 }

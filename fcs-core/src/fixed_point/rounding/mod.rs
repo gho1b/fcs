@@ -122,9 +122,8 @@ macro_rules! fn_checked_round {
 }
 
 fn_checked_round!(checked_round_i64, i64, checked_div_rem_euclid_signed_i64);
-// NOTE: Despite its name, `checked_round_i28` rounds `i128` values.
-// The name is kept to avoid churn in call sites.
-fn_checked_round!(checked_round_i28, i128, checked_div_rem_euclid_signed_i128);
+
+fn_checked_round!(checked_round_i128, i128, checked_div_rem_euclid_signed_i128);
 
 #[cfg(test)]
 mod tests;

@@ -295,7 +295,7 @@ fn rounding_matrix_java_style_i128_small_samples() {
 
     for (mode, expected) in cases {
         for (idx, &n) in samples.iter().enumerate() {
-            let got = checked_round_i28(n, DENOM_128, *mode)
+            let got = checked_round_i128(n, DENOM_128, *mode)
                 .unwrap_or_else(|| panic!("got None: mode={mode:?}, sample_idx={idx}"));
             assert_eq!(
                 got, expected[idx],
@@ -320,7 +320,7 @@ fn exact_division_no_rounding_all_modes_i128() {
 
     for &n in &nums {
         for &m in &modes {
-            let got = checked_round_i28(n, DENOM_128, m).unwrap();
+            let got = checked_round_i128(n, DENOM_128, m).unwrap();
             assert_eq!(got, n / DENOM_128, "mode={m:?}, n={n}");
         }
     }
@@ -339,9 +339,9 @@ fn none_cases_propagate_i128() {
     ];
 
     for &m in &modes {
-        assert_eq!(checked_round_i28(123, 0, m), None, "mode={m:?}");
-        assert_eq!(checked_round_i28(123, i128::MIN, m), None, "mode={m:?}");
-        assert_eq!(checked_round_i28(i128::MIN, -1, m), None, "mode={m:?}");
+        assert_eq!(checked_round_i128(123, 0, m), None, "mode={m:?}");
+        assert_eq!(checked_round_i128(123, i128::MIN, m), None, "mode={m:?}");
+        assert_eq!(checked_round_i128(i128::MIN, -1, m), None, "mode={m:?}");
     }
 }
 
@@ -350,7 +350,7 @@ fn half_even_ties_go_to_even_across_signs_i128() {
     let d: i128 = 2;
     for k in -50_i128..=50 {
         let n = 2 * k + 1; // k + 0.5
-        let got = checked_round_i28(n, d, RoundingMode::HalfEven).unwrap();
+        let got = checked_round_i128(n, d, RoundingMode::HalfEven).unwrap();
         let lo = n.div_euclid(d);
         let expected = if (lo & 1) != 0 { lo + 1 } else { lo };
         assert_eq!(got, expected, "n={n}, d={d}, lo={lo}");
@@ -370,15 +370,15 @@ fn symmetry_on_negation_matches_expected_modes_i128() {
             RoundingMode::TowardZero,
             RoundingMode::AwayFromZero,
         ] {
-            let a = checked_round_i28(n, d, m).unwrap();
-            let b = checked_round_i28(-n, d, m).unwrap();
+            let a = checked_round_i128(n, d, m).unwrap();
+            let b = checked_round_i128(-n, d, m).unwrap();
             assert_eq!(b, -a, "mode={m:?}, n={n}");
         }
 
-        let f = checked_round_i28(n, d, RoundingMode::Floor).unwrap();
-        let c = checked_round_i28(n, d, RoundingMode::Ceil).unwrap();
-        let f_neg = checked_round_i28(-n, d, RoundingMode::Floor).unwrap();
-        let c_neg = checked_round_i28(-n, d, RoundingMode::Ceil).unwrap();
+        let f = checked_round_i128(n, d, RoundingMode::Floor).unwrap();
+        let c = checked_round_i128(n, d, RoundingMode::Ceil).unwrap();
+        let f_neg = checked_round_i128(-n, d, RoundingMode::Floor).unwrap();
+        let c_neg = checked_round_i128(-n, d, RoundingMode::Ceil).unwrap();
         assert_eq!(f_neg, -c, "n={n} floor(-x) != -ceil(x)");
         assert_eq!(c_neg, -f, "n={n} ceil(-x) != -floor(x)");
     }
@@ -400,7 +400,7 @@ fn matches_reference_implementation_for_many_samples_i128() {
     for &d in &denoms {
         for n in -500_i128..=500 {
             for &m in &modes {
-                let got = checked_round_i28(n, d, m);
+                let got = checked_round_i128(n, d, m);
                 let expected = ref_round_i128(n, d, m);
                 assert_eq!(got, expected, "mismatch n={n} d={d} mode={m:?}");
             }

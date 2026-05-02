@@ -7,27 +7,29 @@ macro_rules! fn_checked_div_rem_euclid_signed {
                 return None;
             }
 
-            // Kamu ingin mengembalikan abs(b) sebagai $t.
-            // Ini overflow saat b == $t::MIN, jadi kita kembalikan None (konsisten dengan fungsi kamu).
+            // Positive divisor magnitude. This fails for MIN because abs(MIN)
+            // is not representable in signed integer.
             let div = b.checked_abs()?;
 
-            // Truncating division & remainder (seperti / dan % di Rust)
             let q0 = a.checked_div(b)?;
             let r0 = a.checked_rem(b)?;
 
-            // Jika remainder sudah >= 0, itu sudah Euclidean remainder (range 0..|b|)
+            // Rust remainder has the same sign as `a`.
+            // If it is already non-negative, it is Euclidean.
             if r0 >= 0 {
                 return Some((q0, r0, div));
             }
 
-            // Jika r0 negatif, lakukan penyesuaian 1 langkah agar r menjadi non-negatif
+            // Adjust one step so:
+            // a = q * b + r
+            // 0 <= r < abs(b)
             if b > 0 {
                 let q = q0.checked_sub(1)?;
-                let r = r0.checked_add(b)?; // b positif
+                let r = r0.checked_add(b)?;
                 Some((q, r, div))
             } else {
                 let q = q0.checked_add(1)?;
-                let r = r0.checked_sub(b)?; // b negatif, jadi r0 - b = r0 + |b|
+                let r = r0.checked_sub(b)?;
                 Some((q, r, div))
             }
         }
@@ -285,5 +287,16 @@ mod tests {
     #[should_panic]
     fn div_rem_euclid_single_pass_i128_panics_on_min_divisor_abs_overflow() {
         let _ = div_rem_euclid_single_pass_i128(1, i128::MIN);
+    }
+
+    #[test]
+    fn test_checked_div_rem_euclid_signed_i64_none_cases() {
+        assert_eq!(checked_div_rem_euclid_signed_i64(1, 0), None);
+
+        // abs(i64::MIN) tidak representable.
+        assert_eq!(checked_div_rem_euclid_signed_i64(1, i64::MIN), None);
+
+        // division overflow.
+        assert_eq!(checked_div_rem_euclid_signed_i64(i64::MIN, -1), None);
     }
 }

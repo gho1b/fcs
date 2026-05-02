@@ -6,10 +6,12 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 mod division;
 pub(crate) mod helper;
 mod multiplication;
+pub(crate) mod rounding;
 #[cfg(test)]
 mod tests;
 
 pub use division::DivResult;
+use rounding::RoundingMode;
 
 const VALID_SCALES: [i64; 19] = [
     1,
@@ -35,76 +37,6 @@ const VALID_SCALES: [i64; 19] = [
 
 pub(crate) fn valid_scale(scale: i64) -> bool {
     VALID_SCALES.binary_search(&scale).is_ok()
-}
-
-/// # Rounding Mode
-///
-/// ## Logical Matrix
-///
-/// | Mode               | `1.2` | `1.5` | `1.8` | `-1.2` | `-1.5` | `-1.8` |
-/// | ------------------ | ----: | ----: | ----: | -----: | -----: | -----: |
-/// | `Floor`            |   `1` |   `1` |   `1` |   `-2` |   `-2` |   `-2` |
-/// | `Ceil`             |   `2` |   `2` |   `2` |   `-1` |   `-1` |   `-1` |
-/// | `TowardZero`       |   `1` |   `1` |   `1` |   `-1` |   `-1` |   `-1` |
-/// | `AwayFromZero`     |   `2` |   `2` |   `2` |   `-2` |   `-2` |   `-2` |
-/// | `HalfEven`         |   `1` |   `2` |   `2` |   `-1` |   `-2` |   `-2` |
-/// | `HalfCeil`         |   `1` |   `2` |   `2` |   `-1` |   `-1` |   `-2` |
-/// | `HalfFloor`        |   `1` |   `1` |   `2` |   `-1` |   `-2` |   `-2` |
-/// | `HalfAwayFromZero` |   `1` |   `2` |   `2` |   `-1` |   `-2` |   `-2` |
-/// | `HalfTowardZero`   |   `1` |   `1` |   `2` |   `-1` |   `-1` |   `-2` |
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub enum RoundingMode {
-    /// Round to nearest; ties go to the even result.
-    ///
-    /// ToNearestTiesToEven
-    ///
-    /// Often called banker's rounding or unbiased rounding.
-    #[default]
-    HalfEven,
-    /// Round to nearest; ties go to the greater numeric (toward +∞)
-    ///
-    /// ToNearestTiesTowardPositiveInfinity
-    ///
-    /// Examples:
-    /// - `2.5 -> 3`
-    /// - `-2.5 -> -2`
-    HalfCeil,
-    /// Round to nearest; ties go to the smaller numeric (toward -∞)
-    ///
-    /// ToNearestTiesTowardNegativeInfinity
-    ///
-    /// Examples:
-    /// - `2.5 -> 2`
-    /// - `-2.5 -> -3`
-    HalfFloor,
-    /// Round to nearest; ties go toward zero.
-    ///
-    /// ToNearestTiesTowardZero
-    ///
-    /// Examples:
-    /// - `2.5 -> 2`
-    /// - `-2.5 -> -2`
-    HalfTowardsZero,
-    /// Round to nearest; ties go away from zero.
-    ///
-    /// ToNearestTiesAwayFromZero
-    ///
-    /// Examples:
-    /// - `2.5 -> 3`
-    /// - `-2.5 -> -3`
-    HalfAwayFromZero,
-    /// Round toward negative infinity.
-    ///
-    /// TowardNegativeInfinity
-    Floor,
-    /// Round toward positive infinity.
-    ///
-    /// TowardPositiveInfinity
-    Ceil,
-    /// Round toward zero.
-    TowardZero,
-    /// Round away from zero.
-    AwayFromZero,
 }
 
 #[must_use]
